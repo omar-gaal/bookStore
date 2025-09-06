@@ -1,18 +1,21 @@
 <script setup lang="ts">
-const { listByType } = useUmbraco()
+const { listBooks } = useUmbraco()
 
-// Shape your expected Book properties; adjust names to your doc type
 type BookProps = {
   title?: string
-  slug?: string
+  umbracoUrlName?: string
   price?: number
-  cover?: { url: string } | { src: string } | any
-  description?: string
+  cover?: any[] | any
+  description?: { markup?: string }
+  author?: string
 }
 
-const { data, pending, error } = await useAsyncData('books', () =>
-  listByType<BookProps>('book', 1, 24)
-)
+const { data, pending, error } = await useAsyncData('books', async () => {
+  const res = await listBooks()
+  return res.items as Array<{ id:string; route?:{path?:string}; properties: BookProps }>
+})
+
+const coverUrl = (c: any) => Array.isArray(c) ? c[0]?.url ?? '' : (c?.url ?? c?.src ?? '')
 </script>
 
 <template>
@@ -24,20 +27,16 @@ const { data, pending, error } = await useAsyncData('books', () =>
 
     <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-6">
       <NuxtLink
-        v-for="b in data?.items"
+        v-for="b in data"
         :key="b.id"
-        :to="b.route?.path || `/books/${b.properties.slug}`"
+        :to="b.route?.path || `/books/${b.properties.umbracoUrlName || b.id}`"
         class="rounded-xl shadow p-3 hover:shadow-lg transition"
       >
-        <img
-          v-if="(b.properties.cover as any)?.url || (b.properties.cover as any)?.src"
-          :src="(b.properties.cover as any)?.url || (b.properties.cover as any)?.src"
-          alt=""
-          class="w-full h-44 object-cover rounded-lg mb-3"
-        />
-        <div class="font-medium line-clamp-2">{{ b.properties.title || b.name }}</div>
+        <img v-if="coverUrl(b.properties.cover)" :src="coverUrl(b.properties.cover)"
+             class="w-full h-44 object-cover rounded-lg mb-3" alt="" />
+        <div class="font-medium line-clamp-2">{{ b.properties.title || 'Untitled' }}</div>
         <div class="text-sm opacity-70 mt-1">
-          {{ typeof b.properties.price === 'number' ? `$${b.properties.price.toFixed(2)}` : '' }}
+          {{ typeof b.properties.price === 'number' ? `${b.properties.price}` : '' }}
         </div>
       </NuxtLink>
     </div>
@@ -45,7 +44,5 @@ const { data, pending, error } = await useAsyncData('books', () =>
 </template>
 
 <style>
-.line-clamp-2 {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
+.line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 </style>
